@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<b:beans xmlns="http://www.springframework.org/schema/security"
+		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		 xmlns:b="http://www.springframework.org/schema/beans"
+		 xmlns:context="http://www.springframework.org/schema/context"
+		 xmlns:oauth2="http://www.springframework.org/schema/security/oauth2"
+		 xsi:schemaLocation="http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security.xsd
+							http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+							http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
+							http://www.springframework.org/schema/security/oauth2 http://www.springframework.org/schema/security/spring-security-oauth2.xsd">
+
+
+	<context:property-placeholder location="classpath:application.properties"/>
+
+	<b:bean id="authorizationServerRequestMatcher" class="org.springframework.security.web.util.matcher.OrRequestMatcher">
+		<b:constructor-arg>
+			<b:list>
+				<b:bean class="org.springframework.security.web.util.matcher.AntPathRequestMatcher">
+					<b:constructor-arg value="/oauth/token" />
+				</b:bean>
+				<b:bean class="org.springframework.security.web.util.matcher.AntPathRequestMatcher">
+					<b:constructor-arg value="/oauth/token_key" />
+				</b:bean>
+				<b:bean class="org.springframework.security.web.util.matcher.AntPathRequestMatcher">
+					<b:constructor-arg value="/oauth/check_token" />
+				</b:bean>
+			</b:list>
+		</b:constructor-arg>
+	</b:bean>
+
+	<http request-matcher-ref="authorizationServerRequestMatcher" create-session="never" use-expressions="true" authentication-manager-ref="clientsAuthenticationManager">
+		<intercept-url pattern="/oauth/token" access="isFullyAuthenticated()" />
+		<intercept-url pattern="/oauth/token_key" access="permitAll" />
+		<intercept-url pattern="/oauth/check_token" access="permitAll" />
+		<http-basic />
+		<logout />
+		<csrf disabled="true" />
+	</http>
+
+	<http pattern="/messages/**" use-expressions="true" authentication-manager-ref="clientsAuthenticationManager">
+		<intercept-url pattern="/messages/**" access="#oauth2.hasScope('message.read') or hasRole('CLIENT') or hasRole('MESSAGING_CLIENT')" />
+		<http-basic />
+		<logout />
+		<csrf disabled="true" />
+		<custom-filter ref="messages-resource-server-filter" before="BASIC_AUTH_FILTER" />
+		<expression-handler ref="oauthExpressionHandler" />
+	</http>
+
+	<http pattern="/**" use-expressions="true" authentication-manager-ref="usersAuthenticationManager">
+		<intercept-url pattern="/css/**, /index" access="permitAll" />
+		<intercept-url pattern="/user/**" access="hasRole('USER')" />
+		<form-login login-page="/login" authentication-failure-url="/login-error" />
+		<logout />
+	</http>
+
+	<authentication-manager id="usersAuthenticationManager">
+		<authentication-provider>
+			<user-service>
+				<user name="user" password="password" authorities="ROLE_USER" />
+			</user-service>
+		</authentication-provider>
+	</authentication-manager>
+
+	<authentication-manager id="clientsAuthenticationManager">
+		<authentication-provider user-service-ref="clientDetailsUserDetailsService" />
+	</authentication-manager>
+
+	<b:bean id="oauthExpressionHandler" class="org.springframework.security.oauth2.provider.expression.OAuth2WebSecurityExpressionHandler" />
+
+	<b:bean id="clientDetailsUserDetailsService" class="org.springframework.security.oauth2.provider.client.ClientDetailsUserDetailsService">
+		<b:constructor-arg ref="clientDetailsService" />
+	</b:bean>
+
+	<oauth2:client-details-service id="clientDetailsService">
+		<oauth2:client client-id="messaging-app-client"
+					   secret="secret"
+					   authorized-grant-types="authorization_code,refresh_token"
+					   scope="message.read,message.write"
+					   authorities="ROLE_CLIENT,ROLE_MESSAGING_CLIENT"
+					   redirect-uri="${server.url}/messaging" />
+		<oauth2:client client-id="basic-client"
+					   secret="secret"
+					   authorized-grant-types="client_credentials"
+					   scope="message.read"
+					   authorities="ROLE_CLIENT,ROLE_MESSAGING_CLIENT" />
+	</oauth2:client-details-service>
+
+	<oauth2:authorization-server client-details-service-ref="clientDetailsService">
+		<oauth2:authorization-code />
+		<oauth2:refresh-token />
+		<oauth2:client-credentials />
+		<oauth2:password authentication-manager-ref="usersAuthenticationManager"  />
+	</oauth2:authorization-server>
+
+	<oauth2:resource-server id="messages-resource-server-filter" resource-id="messages-resource" />
+
+	<oauth2:resource id="messaging-app-client-resource"
+					 client-id="messaging-app-client"
+					 client-secret="secret"
+					 user-authorization-uri="${server.url}/oauth/authorize"
+					 access-token-uri="${server.url}/oauth/token"
+					 scope="message.read,message.write"
+					 type="authorization_code"
+					 pre-established-redirect-uri="${server.url}/messaging" />
+
+	<oauth2:rest-template id="messagingAppRestTemplate" resource="messaging-app-client-resource" />
+
+</b:beans>
