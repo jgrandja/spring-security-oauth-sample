@@ -17,11 +17,13 @@ package org.springframework.security.oauth.samples;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.security.oauth2.client.EnableOAuth2Sso;
 
 /**
  * @author Joe Grandja
  */
 @SpringBootApplication
+@EnableOAuth2Sso
 public class ResourceServerApplication {
 
 	public static void main(String[] args) {

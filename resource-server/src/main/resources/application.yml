@@ -12,3 +12,4 @@ security:
   oauth2:
     resource:
       filter-order: 3
+      user-info-uri: http://auth-server:8090/api/userinfo

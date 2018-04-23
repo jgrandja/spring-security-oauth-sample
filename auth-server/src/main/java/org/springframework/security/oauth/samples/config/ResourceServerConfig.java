@@ -16,17 +16,12 @@
 package org.springframework.security.oauth.samples.config;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableResourceServer;
 import org.springframework.security.oauth2.config.annotation.web.configuration.ResourceServerConfigurerAdapter;
 import org.springframework.security.oauth2.config.annotation.web.configurers.ResourceServerSecurityConfigurer;
 import org.springframework.security.oauth2.provider.token.TokenStore;
-import org.springframework.security.oauth2.provider.token.store.JwtAccessTokenConverter;
-import org.springframework.security.oauth2.provider.token.store.JwtTokenStore;
-import org.springframework.security.oauth2.provider.token.store.KeyStoreKeyFactory;
 
 /**
  * @author Joe Grandja
@@ -34,7 +29,7 @@ import org.springframework.security.oauth2.provider.token.store.KeyStoreKeyFacto
 @Configuration
 @EnableResourceServer
 public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
-	private static final String RESOURCE_ID = "messages-resource";
+	private static final String RESOURCE_ID = "auth-resource";
 
 	@Autowired
 	private TokenStore tokenStore;
@@ -48,24 +43,9 @@ public class ResourceServerConfig extends ResourceServerConfigurerAdapter {
 	public void configure(HttpSecurity http) throws Exception {
 		// @formatter:off
 		http
-			.antMatcher("/messages/**")
+			.antMatcher("/api/**")
 			.authorizeRequests()
-				.antMatchers("/messages/**").access("#oauth2.hasScope('message.read') or hasRole('USER')");
+				.antMatchers("/api/userinfo").hasRole("USER");
 		// @formatter:on
-	}
-
-	@Bean
-	public TokenStore tokenStore() {
-		JwtTokenStore tokenStore = new JwtTokenStore(accessTokenConverter());
-		return tokenStore;
-	}
-
-	@Bean
-	public JwtAccessTokenConverter accessTokenConverter() {
-		JwtAccessTokenConverter converter = new JwtAccessTokenConverter();
-		KeyStoreKeyFactory keyStoreKeyFactory = new KeyStoreKeyFactory(
-				new ClassPathResource(".keystore-oauth2-demo"), "admin1234".toCharArray());
-		converter.setKeyPair(keyStoreKeyFactory.getKeyPair("oauth2-demo-key"));
-		return converter;
 	}
 }
