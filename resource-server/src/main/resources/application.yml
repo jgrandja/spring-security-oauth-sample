@@ -12,3 +12,5 @@ security:
   oauth2:
     resource:
       filter-order: 3
+      jwk:
+        key-set-uri: http://auth-server:8090/oauth2/keys

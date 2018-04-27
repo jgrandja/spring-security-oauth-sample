@@ -29,7 +29,8 @@ dependencies {
     compile 'org.springframework.boot:spring-boot-starter-web',
             'org.springframework.boot:spring-boot-starter-security',
             'org.springframework.security.oauth:spring-security-oauth2:2.3.2.RELEASE',
-            'org.springframework.security:spring-security-jwt:1.0.9.RELEASE'
+            'org.springframework.security:spring-security-jwt:1.0.9.RELEASE',
+            'com.nimbusds:nimbus-jose-jwt:5.9'
 
     testCompile 'org.springframework.boot:spring-boot-starter-test',
             'org.springframework.security:spring-security-test',

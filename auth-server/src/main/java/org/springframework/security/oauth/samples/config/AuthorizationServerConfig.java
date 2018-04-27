@@ -15,15 +15,25 @@
  */
 package org.springframework.security.oauth.samples.config;
 
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.KeyUse;
+import com.nimbusds.jose.jwk.RSAKey;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
+import org.springframework.security.jwt.JwtHelper;
+import org.springframework.security.jwt.crypto.sign.RsaSigner;
+import org.springframework.security.jwt.crypto.sign.RsaVerifier;
+import org.springframework.security.oauth2.common.OAuth2AccessToken;
+import org.springframework.security.oauth2.common.util.JsonParser;
+import org.springframework.security.oauth2.common.util.JsonParserFactory;
 import org.springframework.security.oauth2.config.annotation.configurers.ClientDetailsServiceConfigurer;
 import org.springframework.security.oauth2.config.annotation.web.configuration.AuthorizationServerConfigurerAdapter;
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableAuthorizationServer;
 import org.springframework.security.oauth2.config.annotation.web.configurers.AuthorizationServerEndpointsConfigurer;
 import org.springframework.security.oauth2.provider.ClientDetailsService;
+import org.springframework.security.oauth2.provider.OAuth2Authentication;
 import org.springframework.security.oauth2.provider.approval.ApprovalStore;
 import org.springframework.security.oauth2.provider.approval.ApprovalStoreUserApprovalHandler;
 import org.springframework.security.oauth2.provider.approval.InMemoryApprovalStore;
@@ -32,7 +42,9 @@ import org.springframework.security.oauth2.provider.request.DefaultOAuth2Request
 import org.springframework.security.oauth2.provider.token.TokenStore;
 import org.springframework.security.oauth2.provider.token.store.JwtAccessTokenConverter;
 import org.springframework.security.oauth2.provider.token.store.JwtTokenStore;
-import org.springframework.security.oauth2.provider.token.store.KeyStoreKeyFactory;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * @author Joe Grandja
@@ -53,8 +65,7 @@ public class AuthorizationServerConfig extends AuthorizationServerConfigurerAdap
 				.authorities("ROLE_CLIENT", "ROLE_MESSAGING_CLIENT")
 				.scopes("message.read", "message.write")
 				.secret("secret")
-				.redirectUris("http://localhost:8080/messaging", "http://localhost:8080/messaging/index")
-				.accessTokenValiditySeconds(60);
+				.redirectUris("http://localhost:8080/messaging", "http://localhost:8080/messaging/index");
 		// @formatter:on
 	}
 
@@ -70,8 +81,8 @@ public class AuthorizationServerConfig extends AuthorizationServerConfigurerAdap
 	public UserApprovalHandler userApprovalHandler() {
 		ApprovalStoreUserApprovalHandler userApprovalHandler = new ApprovalStoreUserApprovalHandler();
 		userApprovalHandler.setApprovalStore(approvalStore());
-		userApprovalHandler.setClientDetailsService(clientDetailsService);
-		userApprovalHandler.setRequestFactory(new DefaultOAuth2RequestFactory(clientDetailsService));
+		userApprovalHandler.setClientDetailsService(this.clientDetailsService);
+		userApprovalHandler.setRequestFactory(new DefaultOAuth2RequestFactory(this.clientDetailsService));
 		return userApprovalHandler;
 	}
 
@@ -84,10 +95,27 @@ public class AuthorizationServerConfig extends AuthorizationServerConfigurerAdap
 
 	@Bean
 	public JwtAccessTokenConverter accessTokenConverter() {
-		JwtAccessTokenConverter converter = new JwtAccessTokenConverter();
-		KeyStoreKeyFactory keyStoreKeyFactory = new KeyStoreKeyFactory(
-				new ClassPathResource(".keystore-oauth2-demo"), "admin1234".toCharArray());
-		converter.setKeyPair(keyStoreKeyFactory.getKeyPair("oauth2-demo-key"));
+		final RsaSigner signer = new RsaSigner(KeyConfig.getSignerKey());
+
+		JwtAccessTokenConverter converter = new JwtAccessTokenConverter() {
+			private JsonParser objectMapper = JsonParserFactory.create();
+
+			@Override
+			protected String encode(OAuth2AccessToken accessToken, OAuth2Authentication authentication) {
+				String content;
+				try {
+					content = objectMapper.formatMap(getAccessTokenConverter().convertAccessToken(accessToken, authentication));
+				} catch (Exception ex) {
+					throw new IllegalStateException("Cannot convert access token to JSON", ex);
+				}
+				Map<String, String> headers = new HashMap<>();
+				headers.put("kid", KeyConfig.VERIFIER_KEY_ID);
+				String token = JwtHelper.encode(content, signer, headers).getEncoded();
+				return token;
+			}
+		};
+		converter.setSigner(signer);
+		converter.setVerifier(new RsaVerifier(KeyConfig.getVerifierKey()));
 		return converter;
 	}
 
@@ -95,5 +123,14 @@ public class AuthorizationServerConfig extends AuthorizationServerConfigurerAdap
 	public ApprovalStore approvalStore() {
 		InMemoryApprovalStore store = new InMemoryApprovalStore();
 		return store;
+	}
+
+	@Bean
+	public JWKSet jwkSet() {
+		RSAKey.Builder builder = new RSAKey.Builder(KeyConfig.getVerifierKey())
+				.keyUse(KeyUse.SIGNATURE)
+				.algorithm(JWSAlgorithm.RS256)
+				.keyID(KeyConfig.VERIFIER_KEY_ID);
+		return new JWKSet(builder.build());
 	}
 }
