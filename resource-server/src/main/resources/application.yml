@@ -12,3 +12,7 @@ security:
   oauth2:
     resource:
       filter-order: 3
+      token-info-uri: http://localhost:8090/oauth/check_token
+    client:
+      client-id: basic-client
+      client-secret: secret

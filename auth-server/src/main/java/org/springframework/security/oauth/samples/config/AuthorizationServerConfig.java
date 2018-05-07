@@ -15,24 +15,11 @@
  */
 package org.springframework.security.oauth.samples.config;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.security.oauth2.config.annotation.configurers.ClientDetailsServiceConfigurer;
 import org.springframework.security.oauth2.config.annotation.web.configuration.AuthorizationServerConfigurerAdapter;
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableAuthorizationServer;
-import org.springframework.security.oauth2.config.annotation.web.configurers.AuthorizationServerEndpointsConfigurer;
-import org.springframework.security.oauth2.provider.ClientDetailsService;
-import org.springframework.security.oauth2.provider.approval.ApprovalStore;
-import org.springframework.security.oauth2.provider.approval.ApprovalStoreUserApprovalHandler;
-import org.springframework.security.oauth2.provider.approval.InMemoryApprovalStore;
-import org.springframework.security.oauth2.provider.approval.UserApprovalHandler;
-import org.springframework.security.oauth2.provider.request.DefaultOAuth2RequestFactory;
-import org.springframework.security.oauth2.provider.token.TokenStore;
-import org.springframework.security.oauth2.provider.token.store.JwtAccessTokenConverter;
-import org.springframework.security.oauth2.provider.token.store.JwtTokenStore;
-import org.springframework.security.oauth2.provider.token.store.KeyStoreKeyFactory;
+import org.springframework.security.oauth2.config.annotation.web.configurers.AuthorizationServerSecurityConfigurer;
 
 /**
  * @author Joe Grandja
@@ -40,9 +27,6 @@ import org.springframework.security.oauth2.provider.token.store.KeyStoreKeyFacto
 @Configuration
 @EnableAuthorizationServer
 public class AuthorizationServerConfig extends AuthorizationServerConfigurerAdapter {
-
-	@Autowired
-	private ClientDetailsService clientDetailsService;
 
 	@Override
 	public void configure(ClientDetailsServiceConfigurer clients) throws Exception {
@@ -54,46 +38,16 @@ public class AuthorizationServerConfig extends AuthorizationServerConfigurerAdap
 				.scopes("message.read", "message.write")
 				.secret("secret")
 				.redirectUris("http://localhost:8080/messaging", "http://localhost:8080/messaging/index")
-				.accessTokenValiditySeconds(60);
+				.and()
+			.withClient("basic-client")
+				.secret("secret")
+				.authorizedGrantTypes("client_credentials")
+				.authorities("ROLE_CLIENT");
 		// @formatter:on
 	}
 
 	@Override
-	public void configure(AuthorizationServerEndpointsConfigurer endpoints) throws Exception {
-		endpoints
-				.tokenStore(tokenStore())
-				.userApprovalHandler(userApprovalHandler())
-				.accessTokenConverter(accessTokenConverter());
-	}
-
-	@Bean
-	public UserApprovalHandler userApprovalHandler() {
-		ApprovalStoreUserApprovalHandler userApprovalHandler = new ApprovalStoreUserApprovalHandler();
-		userApprovalHandler.setApprovalStore(approvalStore());
-		userApprovalHandler.setClientDetailsService(clientDetailsService);
-		userApprovalHandler.setRequestFactory(new DefaultOAuth2RequestFactory(clientDetailsService));
-		return userApprovalHandler;
-	}
-
-	@Bean
-	public TokenStore tokenStore() {
-		JwtTokenStore tokenStore = new JwtTokenStore(accessTokenConverter());
-		tokenStore.setApprovalStore(approvalStore());
-		return tokenStore;
-	}
-
-	@Bean
-	public JwtAccessTokenConverter accessTokenConverter() {
-		JwtAccessTokenConverter converter = new JwtAccessTokenConverter();
-		KeyStoreKeyFactory keyStoreKeyFactory = new KeyStoreKeyFactory(
-				new ClassPathResource(".keystore-oauth2-demo"), "admin1234".toCharArray());
-		converter.setKeyPair(keyStoreKeyFactory.getKeyPair("oauth2-demo-key"));
-		return converter;
-	}
-
-	@Bean
-	public ApprovalStore approvalStore() {
-		InMemoryApprovalStore store = new InMemoryApprovalStore();
-		return store;
+	public void configure(AuthorizationServerSecurityConfigurer security) throws Exception {
+		security.checkTokenAccess("hasRole('CLIENT')");
 	}
 }

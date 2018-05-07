@@ -30,8 +30,7 @@ dependencies {
             'org.springframework.boot:spring-boot-starter-security',
             'org.springframework.boot:spring-boot-starter-thymeleaf',
             'org.thymeleaf.extras:thymeleaf-extras-springsecurity4:2.1.2.RELEASE',
-            'org.springframework.security.oauth:spring-security-oauth2:2.3.2.RELEASE',
-            'org.springframework.security:spring-security-jwt:1.0.9.RELEASE'
+            'org.springframework.security.oauth:spring-security-oauth2:2.3.2.RELEASE'
 
     testCompile 'org.springframework.boot:spring-boot-starter-test',
             'org.springframework.security:spring-security-test',
