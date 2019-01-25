@@ -20,6 +20,7 @@ security:
         client-secret: secret
         user-authorization-uri: http://auth-server:8090/oauth/authorize
         access-token-uri: http://auth-server:8090/oauth/token
+        authorized-grant-ypes: authorization_code, refresh_token, password
         scope: message.read, message.write
         pre-established-redirect-uri: http://localhost:8080/messaging/index
 

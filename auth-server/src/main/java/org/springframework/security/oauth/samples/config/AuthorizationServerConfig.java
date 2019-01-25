@@ -22,6 +22,11 @@ import com.nimbusds.jose.jwk.RSAKey;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.jwt.JwtHelper;
 import org.springframework.security.jwt.crypto.sign.RsaSigner;
 import org.springframework.security.jwt.crypto.sign.RsaVerifier;
@@ -34,11 +39,14 @@ import org.springframework.security.oauth2.config.annotation.web.configuration.E
 import org.springframework.security.oauth2.config.annotation.web.configurers.AuthorizationServerEndpointsConfigurer;
 import org.springframework.security.oauth2.provider.ClientDetailsService;
 import org.springframework.security.oauth2.provider.OAuth2Authentication;
+import org.springframework.security.oauth2.provider.TokenRequest;
 import org.springframework.security.oauth2.provider.approval.ApprovalStore;
 import org.springframework.security.oauth2.provider.approval.ApprovalStoreUserApprovalHandler;
 import org.springframework.security.oauth2.provider.approval.InMemoryApprovalStore;
 import org.springframework.security.oauth2.provider.approval.UserApprovalHandler;
 import org.springframework.security.oauth2.provider.request.DefaultOAuth2RequestFactory;
+import org.springframework.security.oauth2.provider.token.AuthorizationServerTokenServices;
+import org.springframework.security.oauth2.provider.token.DefaultTokenServices;
 import org.springframework.security.oauth2.provider.token.TokenStore;
 import org.springframework.security.oauth2.provider.token.store.JwtAccessTokenConverter;
 import org.springframework.security.oauth2.provider.token.store.JwtTokenStore;
@@ -56,12 +64,18 @@ public class AuthorizationServerConfig extends AuthorizationServerConfigurerAdap
 	@Autowired
 	private ClientDetailsService clientDetailsService;
 
+	@Autowired(required = false)
+	private UserDetailsService userDetailsService;
+
+	@Autowired
+	private AuthenticationManager authenticationManager;
+
 	@Override
 	public void configure(ClientDetailsServiceConfigurer clients) throws Exception {
 		// @formatter:off
 		clients.inMemory()
 			.withClient("messaging-app-client")
-				.authorizedGrantTypes("authorization_code", "refresh_token")
+				.authorizedGrantTypes("authorization_code", "refresh_token", "password")
 				.authorities("ROLE_CLIENT", "ROLE_MESSAGING_CLIENT")
 				.scopes("message.read", "message.write")
 				.secret("secret")
@@ -74,7 +88,9 @@ public class AuthorizationServerConfig extends AuthorizationServerConfigurerAdap
 		endpoints
 				.tokenStore(tokenStore())
 				.userApprovalHandler(userApprovalHandler())
-				.accessTokenConverter(accessTokenConverter());
+				.accessTokenConverter(accessTokenConverter())
+				.authenticationManager(this.authenticationManager)
+				.tokenServices(this.tokenServices());
 	}
 
 	@Bean
@@ -84,6 +100,44 @@ public class AuthorizationServerConfig extends AuthorizationServerConfigurerAdap
 		userApprovalHandler.setClientDetailsService(this.clientDetailsService);
 		userApprovalHandler.setRequestFactory(new DefaultOAuth2RequestFactory(this.clientDetailsService));
 		return userApprovalHandler;
+	}
+
+	@Bean
+	public AuthorizationServerTokenServices tokenServices() {
+		final DefaultTokenServices defaultTokenServices = new DefaultTokenServices();
+		defaultTokenServices.setClientDetailsService(this.clientDetailsService);
+		defaultTokenServices.setSupportRefreshToken(true);
+		defaultTokenServices.setTokenStore(tokenStore());
+		defaultTokenServices.setTokenEnhancer(accessTokenConverter());
+		defaultTokenServices.setAuthenticationManager(this.authenticationManager);
+
+		return new AuthorizationServerTokenServices() {
+
+			@Override
+			public OAuth2AccessToken createAccessToken(OAuth2Authentication authentication) throws AuthenticationException {
+				UsernamePasswordAuthenticationToken userAuthentication =
+						(UsernamePasswordAuthenticationToken) authentication.getUserAuthentication();
+				User principal = (User) userAuthentication.getPrincipal();
+
+				Map clientDetails = (Map) userAuthentication.getDetails();
+				String clientId = (String) clientDetails.get("client_id");
+
+				// Post-authentication callback
+				// TODO Validate/authenticate user and/or client
+
+				return defaultTokenServices.createAccessToken(authentication);
+			}
+
+			@Override
+			public OAuth2AccessToken refreshAccessToken(String refreshToken, TokenRequest tokenRequest) throws AuthenticationException {
+				return defaultTokenServices.refreshAccessToken(refreshToken, tokenRequest);
+			}
+
+			@Override
+			public OAuth2AccessToken getAccessToken(OAuth2Authentication authentication) {
+				return defaultTokenServices.getAccessToken(authentication);
+			}
+		};
 	}
 
 	@Bean
