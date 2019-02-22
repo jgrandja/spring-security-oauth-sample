@@ -22,6 +22,7 @@ import com.nimbusds.jose.jwk.RSAKey;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.security.jwt.JwtHelper;
 import org.springframework.security.jwt.crypto.sign.RsaSigner;
 import org.springframework.security.jwt.crypto.sign.RsaVerifier;
@@ -30,7 +31,7 @@ import org.springframework.security.oauth2.common.util.JsonParser;
 import org.springframework.security.oauth2.common.util.JsonParserFactory;
 import org.springframework.security.oauth2.config.annotation.configurers.ClientDetailsServiceConfigurer;
 import org.springframework.security.oauth2.config.annotation.web.configuration.AuthorizationServerConfigurerAdapter;
-import org.springframework.security.oauth2.config.annotation.web.configuration.EnableAuthorizationServer;
+import org.springframework.security.oauth2.config.annotation.web.configuration.AuthorizationServerEndpointsConfiguration;
 import org.springframework.security.oauth2.config.annotation.web.configurers.AuthorizationServerEndpointsConfigurer;
 import org.springframework.security.oauth2.provider.ClientDetailsService;
 import org.springframework.security.oauth2.provider.OAuth2Authentication;
@@ -50,7 +51,8 @@ import java.util.Map;
  * @author Joe Grandja
  */
 @Configuration
-@EnableAuthorizationServer
+//@EnableAuthorizationServer
+@Import({AuthorizationServerEndpointsConfiguration.class, CustomAuthorizationServerSecurityConfiguration.class})
 public class AuthorizationServerConfig extends AuthorizationServerConfigurerAdapter {
 
 	@Autowired
@@ -65,7 +67,12 @@ public class AuthorizationServerConfig extends AuthorizationServerConfigurerAdap
 				.authorities("ROLE_CLIENT", "ROLE_MESSAGING_CLIENT")
 				.scopes("message.read", "message.write")
 				.secret("secret")
-				.redirectUris("http://localhost:8080/messaging", "http://localhost:8080/messaging/index");
+				.redirectUris("http://localhost:8080/messaging", "http://localhost:8080/messaging/index")
+				.and()
+			.withClient("client-1234")
+				.authorizedGrantTypes("client_credentials")
+				.scopes("scope1")
+				.secret("secret");
 		// @formatter:on
 	}
 
